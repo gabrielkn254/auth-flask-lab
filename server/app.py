@@ -6,6 +6,25 @@ from config import app, db, api
 from models import User, Journal, UserSchema, JournalSchema
 
 
+# home route
+class Home(Resource):
+    def get(self):
+
+        return make_response(
+            {"message": "welcome to Journal",
+             "--help": {
+                 "Login": "POST /login",
+                 "Logout": "DELETE /logout",
+                 "Signup": "POST /signup",
+                 "Check session": "GET /check_session",
+                 "View all journals": "GET /<username>/journals",
+                 "Add a new journal": "POST /<username>/journals",
+                 "View a single journal": "GET /<username>/journals/<int:journal_id>",
+                 "Update journal": "PATCH /<username>/journals/<int:journal_id>",
+                 "Delete journal": "DELETE /<username>/journals/<int:journal_id>",
+             }}, 200
+        )
+
 # IAM routes
 class Signup(Resource):
     def post(self):
@@ -88,8 +107,8 @@ class Logout(Resource):
 
 # Resources routes
 class Journals(Resource):
-    def get(self):
-        user = User.query.filter(User.id == session.get('user_id')).first()
+    def get(self, username):
+        user = User.query.filter(User.username == username).first()
 
         if not user:
             return make_response({"error": "user not found"}, 404)
@@ -100,13 +119,18 @@ class Journals(Resource):
             user_journals, 200
         )
 
-    def post(self):
+    def post(self, username):
+        user = User.query.filter(User.username == username).first()
+
+        if not user:
+            return make_response({"error": "user not found"}, 404)
+        
         request_json = request.get_json(silent=True)
 
         journal = Journal(
             title=request_json.get('title'),
             content=request_json.get('content'),
-            user_id=session.get('user_id')
+            user_id=user.id
         )
 
         try:
@@ -122,8 +146,8 @@ class Journals(Resource):
 
 
 class SingleJournal(Resource):
-    def get(self, id):
-        user = User.query.filter(User.id == session.get('user_id')).first()
+    def get(self, username, id):
+        user = User.query.filter(User.username == username).first()
 
         if not user:
             return make_response({"error": "user not found"}, 404)
@@ -137,9 +161,9 @@ class SingleJournal(Resource):
             JournalSchema().dump(journal), 200
         )
 
-    def patch(self, id):
+    def patch(self, username, id):
         # query user
-        user = User.query.filter(User.id == session.get('user_id')).first()
+        user = User.query.filter(User.username == username).first()
 
         if not user:
             return make_response({"error": "user not found"}, 404)
@@ -169,9 +193,9 @@ class SingleJournal(Resource):
                 {"error": "Unprocessable Entity"}, 422
             )
 
-    def delete(self, id):
+    def delete(self, username, id):
         # query user
-        user = User.query.filter(User.id == session.get('user_id')).first()
+        user = User.query.filter(User.username == username).first()
 
         if not user:
             return make_response({"error": "user not found"}, 404)
@@ -194,21 +218,39 @@ class SingleJournal(Resource):
 # only allowed logged in users to access their journals
 @app.before_request
 def check_if_logged_in():
-    open_access_routes = ['signup', 'check_session', 'login']
+    if request.endpoint in ['journals', 'single_journal']:
 
-    if (request.endpoint) not in open_access_routes and (not session.get('user_id')):
-        return make_response(
-            {"error": "Unauthorized"}, 401
-        )
+        username = request.view_args.get('username')
+
+        # Check if username exists
+        user = User.query.filter(User.username == username).first()
+
+        if not user:
+            return make_response(
+                {"error": "user not found"}, 404
+            )
+
+        # Check if user is logged in
+        if not session.get('user_id'):
+            return make_response(
+                {"error": "Unauthorized"}, 401
+            )
+
+        # Check if logged-in user matches the username in the URL
+        if session['user_id'] != user.id:
+            return make_response(
+                {"error": "Unauthorized"}, 401
+            )
 
 
 # Configure api routes
+api.add_resource(Home, '/', endpoint='home')
 api.add_resource(Signup, '/signup', endpoint='signup')
 api.add_resource(CheckSession, '/check_session', endpoint='check_session')
 api.add_resource(Login, '/login', endpoint='login')
 api.add_resource(Logout, '/logout', endpoint='logout')
-api.add_resource(Journals, '/journals', endpoint='journals')
-api.add_resource(SingleJournal, '/journals/<int:id>', endpoint='single_journal')
+api.add_resource(Journals, '/<username>/journals', endpoint='journals')
+api.add_resource(SingleJournal, '/<username>/journals/<int:id>', endpoint='single_journal')
 
 if __name__ == '__main__':
     app.run(port=5555, debug=True)
