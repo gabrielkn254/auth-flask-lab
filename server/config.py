@@ -10,8 +10,10 @@ from dotenv import load_dotenv
 # load .env files in os
 load_dotenv()
 
-# Create app
+# App configs
 app = Flask(__name__)
+port = os.getenv("PORT", 5555)
+is_app_debug = os.getenv("APP_DEBUG", True)
 
 # db configs
 db_url = os.getenv("DATABASE_URL", "sqlite:///app.db")

@@ -2,7 +2,7 @@ from flask import make_response, request, session
 from flask_restful import Resource
 from sqlalchemy.exc import IntegrityError
 
-from config import app, db, api
+from config import app, db, api, port, is_app_debug
 from models import User, Journal, UserSchema, JournalSchema
 
 
@@ -271,4 +271,4 @@ api.add_resource(Journals, '/<username>/journals', endpoint='journals')
 api.add_resource(SingleJournal, '/<username>/journals/<int:id>', endpoint='single_journal')
 
 if __name__ == '__main__':
-    app.run(port=5555, debug=True)
+    app.run(port=port, debug=is_app_debug)
