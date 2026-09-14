@@ -12,7 +12,7 @@ class Home(Resource):
 
         return make_response(
             {"message": "welcome to Journal",
-             "--help": {
+             "help": {
                  "Login": "POST /login",
                  "Logout": "DELETE /logout",
                  "Signup": "POST /signup",
@@ -57,9 +57,15 @@ class CheckSession(Resource):
     def get(self):
         if session.get('user_id'):
             user = User.query.filter(User.id == session['user_id']).first()
+            schema = UserSchema().dump(user)
             return make_response(
-                UserSchema().dump(user), 200
-                )
+                {
+                    "id": schema.get("id"),
+                    "username": schema.get("username"),
+                    "journals": len(schema.get("journals"))
+                    
+                }, 200
+            )
 
         return make_response(
             {"message": "Not logged in"}, 401
@@ -69,11 +75,16 @@ class CheckSession(Resource):
 class Login(Resource):
     def post(self):
         request_json = request.get_json(silent=True)
+
+        if not request_json:
+            return make_response(
+                {"message": "Empty JSON body"}, 400
+            )
         
         username = request_json.get("username").strip()
         password = request_json.get("password").strip()
 
-        if not username or password:
+        if (not username) or  (not password):
             return make_response(
                 {"message": "Invalid username or password"}, 400
             )
@@ -82,8 +93,15 @@ class Login(Resource):
 
         if user and user.authenticate(password):
             session['user_id'] = user.id
+
+            schema = UserSchema().dump(user)
             return make_response(
-                UserSchema().dump(user), 200
+                {
+                    "id": schema.get("id"),
+                    "username": schema.get("username"),
+                    "journals": len(schema.get("journals"))
+
+                }, 200
             )
 
         return make_response(
@@ -97,7 +115,7 @@ class Logout(Resource):
             session['user_id'] = None
 
             return make_response(
-                {"message": "logged out successfully"}, 204
+                {"message": "logged out successfully"}, 200
             )
 
         return make_response(
@@ -179,7 +197,7 @@ class SingleJournal(Resource):
 
         # patch updates
         journal.title=request_json.get('title', journal.title)
-        journal.content=request_json.get('content', journal.title)
+        journal.content=request_json.get('content', journal.content)
 
         # update database
         try:
@@ -233,7 +251,7 @@ def check_if_logged_in():
         # Check if user is logged in
         if not session.get('user_id'):
             return make_response(
-                {"error": "Unauthorized"}, 401
+                {"error": "Not logged in"}, 401
             )
 
         # Check if logged-in user matches the username in the URL
