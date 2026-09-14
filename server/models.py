@@ -1,9 +1,8 @@
 from marshmallow import Schema, fields
 from sqlalchemy.ext.hybrid import hybrid_property
+from sqlalchemy import func
 
 from config import app, db, bcrypt
-
-
 
 
 # models
@@ -13,7 +12,7 @@ class User(db.Model):
     username = db.Column(db.String, unique=True, nullable=False)
     _password_hash = db.Column(db.String)
 
-    journals = db.relationship('Journal', back_populates='User')
+    journals = db.relationship('Journal', back_populates='user')
 
     @hybrid_property
     def password_hash(self):
@@ -38,6 +37,8 @@ class Journal(db.Model):
     title = db.Column(db.String, nullable=False)
     content = db.Column(db.String)
 
+    date_created = db.Column(db.DateTime, server_default=func.now(), nullable=False)
+
     user_id = db.Column(db.Integer(), db.ForeignKey('users.id'))
     user = db.relationship('User', back_populates="journals")
 
@@ -47,7 +48,7 @@ class UserSchema(Schema):
     id = fields.Int()
     username = fields.String()
 
-    journals  = fields.List(fields.Nested(lambda: JournalSchema(exclude=("user",))))
+    journals  = fields.List(fields.Nested("JournalSchema", exclude=("user",) ))
 
 class JournalSchema(Schema):
     id = fields.Int()
