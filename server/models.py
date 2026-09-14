@@ -1,29 +1,57 @@
-from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import MetaData
 from marshmallow import Schema, fields
+from sqlalchemy.ext.hybrid import hybrid_property
 
-# set naming convections
-metadata = MetaData(naming_convention={
-    "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
-})
+from config import app, db, bcrypt
 
-# create db
-db = SQLAlchemy(metadata=metadata)
+
+
 
 # models
 class User(db.Model):
     __tablename__ = 'users'
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String, unique=True, nullable=False)
+    _password_hash = db.Column(db.String)
 
-    pass
+    journals = db.relationship('Journal', back_populates='User')
+
+    @hybrid_property
+    def password_hash(self):
+        raise AttributeError('Password hashes may not be viewed.')
+    
+    @password_hash.setter
+    def password_hash(self, password):
+        password_hash = bcrypt.generate_password_hash(
+            password.encode('utf-8'))
+        
+        self._password_hash = password_hash.decode('utf-8')
+
+    def authenticate(self, password):
+        return bcrypt.check_password_hash(
+            self._password_hash, password.encode('utf-8'))
+
 
 class Journal(db.Model):
     __tablename__ = 'journals'
-    pass
+
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String, nullable=False)
+    content = db.Column(db.String)
+
+    user_id = db.Column(db.Integer(), db.ForeignKey('users.id'))
+    user = db.relationship('User', back_populates="journals")
 
 
 # schemas
 class UserSchema(Schema):
-    pass
+    id = fields.Int()
+    username = fields.String()
+
+    journals  = fields.List(fields.Nested(lambda: JournalSchema(exclude=("user",))))
 
 class JournalSchema(Schema):
-    pass
+    id = fields.Int()
+    title = fields.String()
+    content = fields.String()
+
+    user = fields.Nested(UserSchema(exclude=("journals",)))
